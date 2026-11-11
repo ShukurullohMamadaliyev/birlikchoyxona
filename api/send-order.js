@@ -22,10 +22,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "Buyurtma ma'lumotlari topilmadi" });
     }
 
-    // Bot token va Chat ID ni Vercel Environment Variables dan olamiz
-    // Agar Vercel da sozlanmagan bo'lsa, xatolik qaytarmasdan xabar beradi
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    // Bot token va Chat ID ni Vercel Environment Variables dan olamiz yoki to'g'ridan-to'g'ri ulaymiz
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8861966441:AAE2HAWyxdf4BaRzUD_eeMda-wN8sGCrzyo";
+    const chatId = process.env.TELEGRAM_CHAT_ID || "-1004357919183";
 
     if (!botToken || !chatId) {
       console.warn("TELEGRAM_BOT_TOKEN yoki TELEGRAM_CHAT_ID sozlanmagan");

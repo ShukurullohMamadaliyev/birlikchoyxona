@@ -582,18 +582,71 @@ function closeConfirmModal() {
   if (modal) modal.classList.remove("active");
 }
 
-// Telegram Bot orqali guruhga buyurtma jo'natish
+// Telegram Bot orqali guruhga buyurtma jo'natish (Serverless + To'g'ridan-to'g'ri zaxira)
 async function sendOrderToTelegram(order, type = "new") {
+  const BOT_TOKEN = "8861966441:AAE2HAWyxdf4BaRzUD_eeMda-wN8sGCrzyo";
+  const CHAT_ID = "-1004357919183";
+
+  // 1. Avval Vercel serverless orqali urinib ko'ramiz
   try {
     const res = await fetch("/api/send-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order, type })
     });
-    return await res.json();
-  } catch (e) {
-    // Lokal yoki offline rejimda bo'lsa konsolga yozadi
-    console.log("Telegram guruhga yuborish signali berildi:", e);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) return data;
+    }
+  } catch (e) {}
+
+  // 2. To'g'ridan-to'g'ri Telegram API orqali jo'natish (Kafolatlangan zaxira)
+  try {
+    let text = "";
+    if (type === "vozvrat") {
+      text = 
+`⚠️ <b>VOZVRAT QILINDI (BEKOR BO'LDI)</b> 👤 @ziffexx
+━━━━━━━━━━━━━━━━━━━━
+🚪 <b>Xona / Stol:</b> ${order.room || "Ko'rsatilmagan"}
+🆔 <b>Chek raqami:</b> #${order.orderId || "---"}
+🕒 <b>Vaqti:</b> ${order.time || ""} • ${order.date || ""}
+💰 <b>Bekor qilingan summa:</b> ${formatPrice(order.grandTotal)}
+━━━━━━━━━━━━━━━━━━━━
+👨‍💼 <b>Mas'ul:</b> @ziffexx
+❌ <i>Ushbu buyurtma kassada VOZVRAT qilindi va bugungi tushumdan chiqarildi.</i>`;
+    } else {
+      const itemsList = (order.items || []).map((it, idx) => {
+        return `${idx + 1}. <b>${it.count}x</b> ${it.name} — ${formatPrice(it.price * it.count)}`;
+      }).join("\n");
+
+      text = 
+`🔔 <b>YANGI BUYURTMA!</b> 👤 @ziffexx
+━━━━━━━━━━━━━━━━━━━━
+🚪 <b>Xona / Stol:</b> ${order.room || "Ko'rsatilmagan"}
+🆔 <b>Chek raqami:</b> #${order.orderId || "---"}
+🕒 <b>Vaqti:</b> ${order.time || ""} • ${order.date || ""}
+━━━━━━━━━━━━━━━━━━━━
+🍽 <b>BUYURTMA QILINGAN TAOMLAR:</b>
+${itemsList}
+━━━━━━━━━━━━━━━━━━━━
+📦 <b>Jami taomlar soni:</b> ${order.totalCount || 0} ta
+💰 <b>JAMI SUMMA:</b> <b>${formatPrice(order.grandTotal)}</b>
+━━━━━━━━━━━━━━━━━━━━
+👨‍💼 <b>Mas'ul:</b> @ziffexx
+✅ <i>Kassa va oshxonaga qabul qilindi</i>`;
+    }
+
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: text,
+        parse_mode: "HTML"
+      })
+    });
+  } catch (err) {
+    console.log("Telegram guruhga yuborish holati:", err);
   }
 }
 
