@@ -582,6 +582,21 @@ function closeConfirmModal() {
   if (modal) modal.classList.remove("active");
 }
 
+// Telegram Bot orqali guruhga buyurtma jo'natish
+async function sendOrderToTelegram(order, type = "new") {
+  try {
+    const res = await fetch("/api/send-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order, type })
+    });
+    return await res.json();
+  } catch (e) {
+    // Lokal yoki offline rejimda bo'lsa konsolga yozadi
+    console.log("Telegram guruhga yuborish signali berildi:", e);
+  }
+}
+
 // Buyurtmani kassa tarixiga saqlash (Admin panel va kassa hisobotlari uchun)
 function recordOrder(mode) {
   try {
@@ -614,12 +629,15 @@ function recordOrder(mode) {
       time: timeStr,
       date: dateStr,
       timestamp: Date.now(),
-      status: "pending", // "pending" (tayyorlanmoqda), "completed" (to'landi), "cancelled" (bekor)
+      status: "pending", // "pending" (tayyorlanmoqda), "completed" (to'landi), "vozvrat" (bekor)
       mode: mode || "online"
     };
 
     orders.unshift(newOrder);
     localStorage.setItem("ibrohim_orders", JSON.stringify(orders));
+
+    // Telegram guruhga real-vaqtda yuborish
+    sendOrderToTelegram(newOrder, "new");
   } catch(e) {
     console.error("Order saqlashda xato", e);
   }
