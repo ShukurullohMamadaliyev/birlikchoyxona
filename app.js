@@ -136,13 +136,40 @@ function renderCategories() {
 }
 
 // ===================================================
+// STOP-LIST VA MOSLASHUVCHAN MA'LUMOTLAR
+// ===================================================
+function getStopList() {
+  try {
+    return JSON.parse(localStorage.getItem("ibrohim_stop_list")) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getAllMenuItems() {
+  let list = [...MENU_ITEMS];
+  try {
+    const priceOverrides = JSON.parse(localStorage.getItem("ibrohim_price_overrides") || "{}");
+    list = list.map(item => {
+      if (priceOverrides[item.id] !== undefined) {
+        return { ...item, price: priceOverrides[item.id] };
+      }
+      return item;
+    });
+    const custom = JSON.parse(localStorage.getItem("ibrohim_custom_dishes")) || [];
+    list = [...list, ...custom];
+  } catch (e) {}
+  return list;
+}
+
+// ===================================================
 // MENYUNI CHIQARISH (2 USTUNLI KARTA)
 // ===================================================
 function renderMenu() {
   const menuContainer = document.getElementById("menuContainer");
   if (!menuContainer) return;
 
-  let items = MENU_ITEMS;
+  let items = getAllMenuItems();
 
   // Qidiruv bo'yicha saralash
   if (searchQuery.trim()) {
@@ -207,10 +234,15 @@ function renderMenu() {
 // Yagona taom kartasi HTML
 function renderDishCard(item) {
   const count = cart[item.id] || 0;
-  const badgeClass = item.badgeType ? `badge-${item.badgeType}` : "badge-default";
+  const stopList = getStopList();
+  const isSoldOut = stopList.includes(item.id);
+  const badgeClass = isSoldOut ? "badge-soldout" : (item.badgeType ? `badge-${item.badgeType}` : "badge-default");
+  const badgeText = isSoldOut ? "🔴 HOZIRCHA YO'Q" : item.badge;
 
   let actionButtonHtml = "";
-  if (count === 0) {
+  if (isSoldOut) {
+    actionButtonHtml = `<span class="sold-out-badge">Tugagan</span>`;
+  } else if (count === 0) {
     actionButtonHtml = `
       <button class="add-btn" data-id="${item.id}" title="Savatchaga qo'shish" aria-label="Qo'shish">
         +
@@ -227,9 +259,9 @@ function renderDishCard(item) {
   }
 
   return `
-    <div class="dish-card" data-id="${item.id}">
+    <div class="dish-card ${isSoldOut ? 'sold-out' : ''}" data-id="${item.id}">
       <div class="dish-img-container view-details" data-id="${item.id}">
-        ${item.badge ? `<span class="dish-badge ${badgeClass}">${escapeHtml(item.badge)}</span>` : ""}
+        ${badgeText ? `<span class="dish-badge ${badgeClass}">${escapeHtml(badgeText)}</span>` : ""}
         <img class="dish-img" src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.src='images/logo_circle.jpg'">
       </div>
       <div class="dish-info">
@@ -287,6 +319,10 @@ function attachCardEvents() {
 // SAVATCHA LOGIKASI
 // ===================================================
 function addToCart(dishId) {
+  if (getStopList().includes(dishId)) {
+    alert("Kechirasiz, ushbu taom hozircha tugagan!");
+    return;
+  }
   playClickSound();
   cart[dishId] = (cart[dishId] || 0) + 1;
   saveCart();
@@ -320,9 +356,10 @@ function clearCart() {
 function getCartSummary() {
   let totalCount = 0;
   let totalPrice = 0;
+  const allDishes = getAllMenuItems();
 
   for (const [id, count] of Object.entries(cart)) {
-    const item = MENU_ITEMS.find(m => m.id === id);
+    const item = allDishes.find(m => m.id === id);
     if (item && count > 0) {
       totalCount += count;
       totalPrice += item.price * count;
@@ -362,7 +399,7 @@ function updateCartUI() {
 
 // 1. Taom haqida batafsil ma'lumot modali
 function openDishDetailsModal(dishId) {
-  const item = MENU_ITEMS.find(m => m.id === dishId);
+  const item = getAllMenuItems().find(m => m.id === dishId);
   if (!item) return;
 
   playClickSound();
@@ -441,8 +478,9 @@ function renderCartSheet() {
   contentArea.style.display = "block";
 
   // Taomlar ro'yxati
+  const allDishes = getAllMenuItems();
   container.innerHTML = cartEntries.map(([id, count]) => {
-    const item = MENU_ITEMS.find(m => m.id === id);
+    const item = allDishes.find(m => m.id === id);
     if (!item || count <= 0) return "";
     const itemTotal = item.price * count;
 
@@ -544,13 +582,55 @@ function closeConfirmModal() {
   if (modal) modal.classList.remove("active");
 }
 
+// Buyurtmani kassa tarixiga saqlash (Admin panel va kassa hisobotlari uchun)
+function recordOrder(mode) {
+  try {
+    const orders = JSON.parse(localStorage.getItem("ibrohim_orders")) || [];
+    const { totalCount, totalPrice, serviceFee, grandTotal } = getCartSummary();
+    const allDishes = getAllMenuItems();
+    const orderedItems = Object.entries(cart).map(([id, count]) => {
+      const it = allDishes.find(d => d.id === id);
+      return {
+        id,
+        count,
+        name: it ? it.name : id,
+        price: it ? it.price : 0,
+        sum: it ? it.price * count : 0
+      };
+    }).filter(i => i.count > 0);
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('uz-UZ');
+
+    const newOrder = {
+      orderId: "ORD-" + Date.now().toString().slice(-5),
+      room: userRoom,
+      items: orderedItems,
+      totalCount,
+      totalPrice,
+      serviceFee,
+      grandTotal,
+      time: timeStr,
+      date: dateStr,
+      timestamp: Date.now(),
+      status: "pending", // "pending" (tayyorlanmoqda), "completed" (to'landi), "cancelled" (bekor)
+      mode: mode || "online"
+    };
+
+    orders.unshift(newOrder);
+    localStorage.setItem("ibrohim_orders", JSON.stringify(orders));
+  } catch(e) {
+    console.error("Order saqlashda xato", e);
+  }
+}
+
 // "Ha, buyurtmani yuboring!" bosilganda
 function confirmAndExecuteOrder() {
   playClickSound();
   closeConfirmModal();
   closeCartModal();
-
-  // Buyurtmani chek shaklida ko'rsatish
+  recordOrder("sent");
   openReceiptScreen("sent");
 }
 
@@ -578,6 +658,7 @@ function handleShowToWaiterClick() {
   saveRoom(currentVal);
   hideRoomValidationError();
   closeCartModal();
+  recordOrder("waiter");
   openReceiptScreen("waiter");
 }
 
@@ -607,9 +688,10 @@ function openReceiptScreen(mode) {
   }
 
   // Taomlar ro'yxati
+  const allDishes = getAllMenuItems();
   const itemsContainer = document.getElementById("receiptItemsList");
   itemsContainer.innerHTML = Object.entries(cart).map(([id, count]) => {
-    const item = MENU_ITEMS.find(m => m.id === id);
+    const item = allDishes.find(m => m.id === id);
     if (!item) return "";
     return `
       <div class="receipt-item-row">
@@ -725,15 +807,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("receiptEditBtn").addEventListener("click", editOrderFromReceipt);
   document.getElementById("receiptNewOrderBtn").addEventListener("click", finishOrderAndReturnToMenu);
 
-  // Modal orqa foniga bosganda yopish
-  document.querySelectorAll(".modal-overlay").forEach(overlay => {
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) {
-        // Confirm modalidan tashqari hammasini orqa fonga bosib yopish mumkin
-        if (overlay.id !== "confirmOrderModal") {
-          overlay.classList.remove("active");
-        }
-      }
-    });
+  // Admin paneldan taomlar holati yoki narxlari o'zgarganda sahifani bir zumda yangilash
+  window.addEventListener("storage", (e) => {
+    if (["ibrohim_stop_list", "ibrohim_price_overrides", "ibrohim_custom_dishes"].includes(e.key)) {
+      renderMenu();
+    }
   });
 });
