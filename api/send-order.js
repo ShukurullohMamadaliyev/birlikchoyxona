@@ -40,14 +40,15 @@ export default async function handler(req, res) {
     if (type === "vozvrat") {
       // Vozvrat xabari
       text = 
-`⚠️ VOZVRAT QILINDI (BEKOR BO'LDI)
+`⚠️ <b>VOZVRAT QILINDI (BEKOR BO'LDI)</b> 👤 @ziffexx
 ━━━━━━━━━━━━━━━━━━━━
-🚪 Xona / Stol: ${order.room || "Ko'rsatilmagan"}
-🆔 Chek raqami: #${order.orderId || "---"}
-🕒 Vaqti: ${order.time || ""} • ${order.date || ""}
-💰 Bekor qilingan summa: ${formatMoney(order.grandTotal)}
+🚪 <b>Xona / Stol:</b> ${escapeTg(order.room || "Ko'rsatilmagan")}
+🆔 <b>Chek raqami:</b> #${order.orderId || "---"}
+🕒 <b>Vaqti:</b> ${order.time || ""} • ${order.date || ""}
+💰 <b>Bekor qilingan summa:</b> ${formatMoney(order.grandTotal)}
 ━━━━━━━━━━━━━━━━━━━━
-❌ Ushbu buyurtma kassada VOZVRAT qilindi va bugungi tushumdan chiqarildi.`;
+👨‍💼 <b>Mas'ul:</b> @ziffexx
+❌ <i>Ushbu buyurtma kassada VOZVRAT qilindi va bugungi tushumdan chiqarildi.</i>`;
     } else {
       // Yangi buyurtma xabari
       const itemsList = (order.items || []).map((item, idx) => {
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
       }).join("\n");
 
       text = 
-`🔔 <b>YANGI BUYURTMA!</b>
+`🔔 <b>YANGI BUYURTMA!</b> 👤 @ziffexx
 ━━━━━━━━━━━━━━━━━━━━
 🚪 <b>Xona / Stol:</b> ${escapeTg(order.room || "Ko'rsatilmagan")}
 🆔 <b>Chek raqami:</b> #${order.orderId || "---"}
@@ -68,6 +69,7 @@ ${itemsList || "Taomlar ro'yxati yo'q"}
 📦 <b>Jami taomlar soni:</b> ${order.totalCount || 0} ta
 💰 <b>JAMI SUMMA:</b> <b>${formatMoney(order.grandTotal)}</b>
 ━━━━━━━━━━━━━━━━━━━━
+👨‍💼 <b>Mas'ul:</b> @ziffexx
 ✅ <i>Kassa va oshxonaga qabul qilindi</i>`;
     }
 
