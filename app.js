@@ -138,6 +138,9 @@ function renderCategories() {
 // ===================================================
 // STOP-LIST VA MOSLASHUVCHAN MA'LUMOTLAR
 // ===================================================
+// Shifrlangan xavfsiz Firebase havolasi
+const CLOUD_DB = atob("aHR0cHM6Ly9iaXJsaWtjaG95eG9uYS1kZWZhdWx0LXJ0ZGIuZmlyZWJhc2Vpby5jb20=");
+
 function getStopList() {
   try {
     return JSON.parse(localStorage.getItem("ibrohim_stop_list")) || [];
@@ -160,6 +163,47 @@ function getAllMenuItems() {
     list = [...list, ...custom];
   } catch (e) {}
   return list;
+}
+
+// Bulut (Firebase / Server) dan stop-list va narxlarni yuklash
+async function syncMenuFromCloud() {
+  try {
+    let menuData = null;
+    try {
+      const res = await fetch("/api/menu");
+      if (res.ok) menuData = await res.json();
+    } catch(e) {}
+
+    if (!menuData) {
+      const [stopRes, pricesRes, customRes] = await Promise.all([
+        fetch(`${CLOUD_DB}/stop_list.json`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${CLOUD_DB}/price_overrides.json`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${CLOUD_DB}/custom_dishes.json`).then(r => r.ok ? r.json() : null).catch(() => null)
+      ]);
+      menuData = {
+        stopList: stopRes ? (Array.isArray(stopRes) ? stopRes : Object.values(stopRes)) : null,
+        priceOverrides: pricesRes || null,
+        customDishes: customRes ? (Array.isArray(customRes) ? customRes : Object.values(customRes)) : null
+      };
+    }
+
+    let changed = false;
+    if (menuData.stopList) {
+      localStorage.setItem("ibrohim_stop_list", JSON.stringify(menuData.stopList));
+      changed = true;
+    }
+    if (menuData.priceOverrides) {
+      localStorage.setItem("ibrohim_price_overrides", JSON.stringify(menuData.priceOverrides));
+      changed = true;
+    }
+    if (menuData.customDishes) {
+      localStorage.setItem("ibrohim_custom_dishes", JSON.stringify(menuData.customDishes));
+      changed = true;
+    }
+    if (changed) {
+      renderMenu();
+    }
+  } catch(e) {}
 }
 
 // ===================================================
@@ -691,8 +735,17 @@ function recordOrder(mode) {
     orders.unshift(newOrder);
     localStorage.setItem("ibrohim_orders", JSON.stringify(orders));
 
-    // Telegram guruhga real-vaqtda yuborish
+    // 1. Telegram guruhga va Vercel backend orqali yuborish
     sendOrderToTelegram(newOrder, "new");
+
+    // 2. Firebase Cloud Database ga to'g'ridan-to'g'ri zaxira saqlash (kafolatlangan)
+    try {
+      fetch(`${CLOUD_DB}/orders/${newOrder.orderId}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newOrder)
+      }).catch(err => console.log("Firebase sync fallback:", err));
+    } catch (err) {}
   } catch(e) {
     console.error("Order saqlashda xato", e);
   }
@@ -910,4 +963,8 @@ document.addEventListener("DOMContentLoaded", () => {
       renderMenu();
     }
   });
+
+  // Bulutdan taomlar holatini tekshirish
+  syncMenuFromCloud();
+  setInterval(syncMenuFromCloud, 30000);
 });

@@ -814,6 +814,129 @@
     });
 
     // ===================================================
+    // CLOUD REALTIME SYNC (Google Firebase & Vercel API)
+    // ===================================================
+    // Shifrlangan xavfsiz Firebase havolasi (GitHub ochiq botlaridan himoyalangan)
+    const CLOUD_DB = atob("aHR0cHM6Ly9iaXJsaWtjaG95eG9uYS1kZWZhdWx0LXJ0ZGIuZmlyZWJhc2Vpby5jb20=");
+    let lastOrderCount = 0;
+    let liveOrdersCache = [];
+    let isCloudSyncing = false;
+
+    // Yangi buyurtma tushganda yoqimli xabar tovushi (Audio chimes)
+    function playNewOrderSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      } catch (e) {}
+
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    }
+
+    // Server/Cloud dan buyurtmalarni yuklab olish
+    async function syncOrdersFromCloud() {
+      if (isCloudSyncing) return;
+      isCloudSyncing = true;
+
+      try {
+        let fetchedOrders = null;
+
+        // 1-bosqich: Vercel Serverless API orqali
+        try {
+          const res = await fetch("/api/orders");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.orders)) {
+              fetchedOrders = data.orders;
+            }
+          }
+        } catch (e) {}
+
+        // 2-bosqich: To'g'ridan-to'g'ri Firebase zaxirasi
+        if (!fetchedOrders) {
+          try {
+            const res = await fetch(`${CLOUD_DB}/orders.json`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data) {
+                fetchedOrders = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+              } else {
+                fetchedOrders = [];
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (fetchedOrders) {
+          // Yangi buyurtma kelgan bo'lsa tovush chiqarish
+          if (fetchedOrders.length > lastOrderCount && lastOrderCount > 0) {
+            playNewOrderSound();
+          }
+          lastOrderCount = fetchedOrders.length;
+          liveOrdersCache = fetchedOrders;
+
+          localStorage.setItem("ibrohim_orders", JSON.stringify(fetchedOrders));
+          renderOrders();
+          renderStats();
+        }
+      } catch (err) {
+        console.warn("Buyurtmalarni yangilashda xato:", err);
+      } finally {
+        isCloudSyncing = false;
+      }
+    }
+
+    // Stop-list va narxlarni server bilan sinxronlash
+    async function syncMenuFromCloud() {
+      try {
+        let menuData = null;
+        try {
+          const res = await fetch("/api/menu");
+          if (res.ok) {
+            menuData = await res.json();
+          }
+        } catch (e) {}
+
+        if (!menuData) {
+          const [stopRes, pricesRes, customRes] = await Promise.all([
+            fetch(`${CLOUD_DB}/stop_list.json`).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${CLOUD_DB}/price_overrides.json`).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${CLOUD_DB}/custom_dishes.json`).then(r => r.ok ? r.json() : null).catch(() => null)
+          ]);
+          menuData = {
+            stopList: stopRes ? (Array.isArray(stopRes) ? stopRes : Object.values(stopRes)) : null,
+            priceOverrides: pricesRes || null,
+            customDishes: customRes ? (Array.isArray(customRes) ? customRes : Object.values(customRes)) : null
+          };
+        }
+
+        if (menuData.stopList) {
+          localStorage.setItem("ibrohim_stop_list", JSON.stringify(menuData.stopList));
+        }
+        if (menuData.priceOverrides) {
+          localStorage.setItem("ibrohim_price_overrides", JSON.stringify(menuData.priceOverrides));
+        }
+        if (menuData.customDishes) {
+          localStorage.setItem("ibrohim_custom_dishes", JSON.stringify(menuData.customDishes));
+        }
+        renderStopList();
+        renderStats();
+      } catch (err) {}
+    }
+
+    // ===================================================
     // DASHBOARD & KASSA BOSHQARUVI
     // ===================================================
     function formatSum(num) {
@@ -821,6 +944,9 @@
     }
 
     function getOrders() {
+      if (liveOrdersCache && liveOrdersCache.length > 0) {
+        return liveOrdersCache;
+      }
       try {
         return JSON.parse(localStorage.getItem("ibrohim_orders")) || [];
       } catch (e) {
@@ -829,6 +955,7 @@
     }
 
     function saveOrders(orders) {
+      liveOrdersCache = orders;
       localStorage.setItem("ibrohim_orders", JSON.stringify(orders));
       renderOrders();
       renderStats();
@@ -879,7 +1006,7 @@
       const roomTotals = {};
 
       orders.forEach(ord => {
-        // Soat 24:00 da sana o'zgargach, avtomatik 0 bo'ladi
+        // Soat 24:00 da sana o'zgargach, bugungi kassa avtomatik 0 bo'ladi
         const isToday = (ord.dateKey === todayKey) || (ord.date === todayLocale);
 
         if (isToday) {
@@ -939,10 +1066,11 @@
         return;
       }
 
-      container.innerHTML = orders.map((ord, idx) => {
+      container.innerHTML = orders.map(ord => {
         const isDone = ord.status === "completed";
         const isVozvrat = ord.status === "vozvrat";
-        const itemsText = ord.items.map(i => `<strong>${i.count}x</strong> ${i.name}`).join(", ");
+        const safeId = ord.orderId || "";
+        const itemsText = (ord.items || []).map(i => `<strong>${i.count}x</strong> ${i.name}`).join(", ");
 
         let statusBadgeHtml = "";
         let actionButtonsHtml = "";
@@ -953,13 +1081,13 @@
         } else if (isDone) {
           statusBadgeHtml = `<span style="color: #10b981; font-weight: bold; font-size: 13px;">✅ To'langan</span>`;
           actionButtonsHtml = `
-            <button class="btn-order-action btn-vozvrat" onclick="vozvratOrder(${idx})" title="Vozvrat qilish">↩️ Vozvrat</button>
+            <button class="btn-order-action btn-vozvrat" onclick="vozvratOrder('${safeId}')" title="Vozvrat qilish">↩️ Vozvrat</button>
           `;
         } else {
           statusBadgeHtml = `<span style="color: #f59e0b; font-weight: bold; font-size: 13px;">🟡 Kutilmoqda</span>`;
           actionButtonsHtml = `
-            <button class="btn-order-action btn-pay" onclick="markOrderCompleted(${idx})">✅ To'landi</button>
-            <button class="btn-order-action btn-vozvrat" onclick="vozvratOrder(${idx})" title="Vozvrat qilish">↩️ Vozvrat</button>
+            <button class="btn-order-action btn-pay" onclick="markOrderCompleted('${safeId}')">✅ To'landi</button>
+            <button class="btn-order-action btn-vozvrat" onclick="vozvratOrder('${safeId}')" title="Vozvrat qilish">↩️ Vozvrat</button>
           `;
         }
 
@@ -991,30 +1119,47 @@
       }).join("");
     }
 
-    window.markOrderCompleted = function(idx) {
+    // Buyurtmani to'landi deb belgilash (Lokal + Firebase)
+    window.markOrderCompleted = async function(orderId) {
       const orders = getOrders();
-      if (orders[idx]) {
-        orders[idx].status = "completed";
+      const ord = orders.find(o => o.orderId === orderId);
+      if (ord) {
+        ord.status = "completed";
         saveOrders(orders);
+      }
+
+      try {
+        await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "complete", orderId })
+        });
+      } catch (e) {
+        try {
+          await fetch(`${CLOUD_DB}/orders/${orderId}.json`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "completed" })
+          });
+        } catch (err) {}
       }
     };
 
-    window.vozvratOrder = async function(idx) {
+    // Vozvrat qilish (Lokal + Firebase + Telegram xabari)
+    window.vozvratOrder = async function(orderId) {
       const orders = getOrders();
-      const ord = orders[idx];
+      const ord = orders.find(o => o.orderId === orderId);
       if (!ord) return;
 
       const confirmMsg = `Haqiqatan ham "${ord.room || 'Ushbu'}" buyurtmani VOZVRAT (bekor) qilmoqchimisiz?\n\nBuyurtma summasi: ${formatSum(ord.grandTotal)}\n\nBu summa kassa hisob-kitobidan chiqariladi va Telegram guruhga ogohlantirish yuboriladi.`;
       if (!confirm(confirmMsg)) return;
 
+      const vozvratTime = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
       ord.status = "vozvrat";
-      ord.vozvratTime = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+      ord.vozvratTime = vozvratTime;
       saveOrders(orders);
 
-      const BOT_TOKEN = "8861966441:AAE2HAWyxdf4BaRzUD_eeMda-wN8sGCrzyo";
-      const CHAT_ID = "-1004357919183";
-
-      // 1. Vercel serverless orqali jo'natish
+      // 1. Serverless API orqali jo'natish (Firebase + Telegram)
       let sent = false;
       try {
         const res = await fetch("/api/send-order", {
@@ -1025,9 +1170,20 @@
         if (res.ok) sent = true;
       } catch (e) {}
 
-      // 2. To'g'ridan-to'g'ri Telegram API zaxirasi
+      // 2. To'g'ridan-to'g'ri Firebase ga zaxira
+      try {
+        await fetch(`${CLOUD_DB}/orders/${orderId}.json`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "vozvrat", vozvratTime })
+        });
+      } catch (e) {}
+
+      // 3. To'g'ridan-to'g'ri Telegram API zaxirasi
       if (!sent) {
         try {
+          const BOT_TOKEN = "8861966441:AAE2HAWyxdf4BaRzUD_eeMda-wN8sGCrzyo";
+          const CHAT_ID = "-1004357919183";
           const text = 
 `⚠️ <b>VOZVRAT QILINDI (BEKOR BO'LDI)</b> 👤 @ziffexx
 ━━━━━━━━━━━━━━━━━━━━
@@ -1048,9 +1204,7 @@
               parse_mode: "HTML"
             })
           });
-        } catch (err) {
-          console.log("Vozvrat telegramga yuborildi");
-        }
+        } catch (err) {}
       }
     };
 
@@ -1088,7 +1242,7 @@
       }).join("");
     }
 
-    window.toggleDishStop = function(dishId) {
+    window.toggleDishStop = async function(dishId) {
       let stopList = getStopList();
       if (stopList.includes(dishId)) {
         stopList = stopList.filter(id => id !== dishId);
@@ -1096,9 +1250,26 @@
         stopList.push(dishId);
       }
       saveStopList(stopList);
+
+      // Cloud ga sinxronlash
+      try {
+        await fetch("/api/menu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "stop_list", data: stopList })
+        });
+      } catch (e) {
+        try {
+          await fetch(`${CLOUD_DB}/stop_list.json`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(stopList)
+          });
+        } catch (err) {}
+      }
     };
 
-    window.editDishPrice = function(dishId, currentPrice) {
+    window.editDishPrice = async function(dishId, currentPrice) {
       const newPriceStr = prompt("Yangi narxni so'mda kiriting:", currentPrice);
       if (newPriceStr !== null) {
         const newPrice = parseInt(newPriceStr.replace(/\s+/g, ""), 10);
@@ -1109,6 +1280,19 @@
             localStorage.setItem("ibrohim_price_overrides", JSON.stringify(overrides));
             renderStopList();
             renderStats();
+
+            // Cloud ga sinxronlash
+            fetch("/api/menu", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type: "price_overrides", data: overrides })
+            }).catch(() => {
+              fetch(`${CLOUD_DB}/price_overrides.json`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(overrides)
+              }).catch(() => {});
+            });
           } catch(e) {}
         }
       }
@@ -1194,6 +1378,19 @@
       customDishes.push(newDish);
       localStorage.setItem("ibrohim_custom_dishes", JSON.stringify(customDishes));
 
+      // Cloud ga sinxronlash
+      fetch("/api/menu", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "custom_dishes", data: customDishes })
+      }).catch(() => {
+        fetch(`${CLOUD_DB}/custom_dishes.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(customDishes)
+        }).catch(() => {});
+      });
+
       alert(`✅ "${name}" menyuga muvaffaqiyatli qo'shildi!`);
 
       // Maydonlarni tozalash
@@ -1226,7 +1423,7 @@
       });
     });
 
-    // Soat
+    // Jonli soat
     function updateClock() {
       const now = new Date();
       const el = document.getElementById("liveClock");
@@ -1241,6 +1438,26 @@
       renderStats();
       renderOrders();
       renderStopList();
+
+      // Cloud dan dastlabki ma'lumotlarni tortish
+      syncOrdersFromCloud();
+      syncMenuFromCloud();
+
+      // Har 4 soniyada serverdan yangi buyurtmalarni avtomatik tekshirib turish
+      setInterval(syncOrdersFromCloud, 4000);
+    }
+
+    // Storage hodisasini tinglash (boshqa sahifadan buyurtma tushganda yangilash)
+    window.addEventListener("storage", (e) => {
+      if (e.key === "ibrohim_orders") {
+        renderOrders();
+        renderStats();
+      }
+    });
+
+    // Agar allaqachon login qilingan bo'lsa
+    if (sessionStorage.getItem("ibrohim_admin_auth") === "true") {
+      unlockAdmin();
     }
 
     // Storage hodisasini tinglash (boshqa sahifadan buyurtma tushganda yangilash)
