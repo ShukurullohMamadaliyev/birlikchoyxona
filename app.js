@@ -807,6 +807,30 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("receiptEditBtn").addEventListener("click", editOrderFromReceipt);
   document.getElementById("receiptNewOrderBtn").addEventListener("click", finishOrderAndReturnToMenu);
 
+  // Maxfiy Admin kirish (Pastdagi dumaloq logotipni ketma-ket 3 marta bosganda ochiladi)
+  let logoClickCount = 0;
+  let logoClickTimer = null;
+  const adminTrigger = document.getElementById("secretAdminTrigger");
+  if (adminTrigger) {
+    adminTrigger.style.cursor = "pointer";
+    adminTrigger.addEventListener("click", () => {
+      logoClickCount++;
+      clearTimeout(logoClickTimer);
+      if (logoClickCount === 3) {
+        logoClickCount = 0;
+        playClickSound();
+        if (navigator.vibrate) {
+          navigator.vibrate([40, 60, 40]);
+        }
+        window.location.href = "admin.html";
+      } else {
+        logoClickTimer = setTimeout(() => {
+          logoClickCount = 0;
+        }, 1500);
+      }
+    });
+  }
+
   // Admin paneldan taomlar holati yoki narxlari o'zgarganda sahifani bir zumda yangilash
   window.addEventListener("storage", (e) => {
     if (["ibrohim_stop_list", "ibrohim_price_overrides", "ibrohim_custom_dishes"].includes(e.key)) {

@@ -638,6 +638,18 @@
             </div>
 
             <div>
+              <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Taom rasmi (Tanlash yoki yuklash)</label>
+              <input type="file" id="newDishFileInput" accept="image/*" style="display: none;">
+              <div id="dishUploadBox" style="border: 2px dashed rgba(251, 191, 36, 0.45); border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; background: rgba(251, 191, 36, 0.05); transition: all 0.2s ease;">
+                <img id="dishUploadPreview" src="" alt="Ko'rish" style="max-height: 120px; border-radius: 8px; margin: 0 auto 8px; display: none; object-fit: cover;">
+                <div id="dishUploadPrompt" style="color: var(--gold-light); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <span>📸</span>
+                  <span>Rasm tanlash (Telefon yoki Kompyuter)</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
               <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Belgisi (Badge)</label>
               <input type="text" id="newDishBadge" class="room-input" style="background: #fff; border-radius: 8px; padding: 10px; width: 100%; box-sizing: border-box;" placeholder="masalan: YANGI yoki XIT">
             </div>
@@ -661,11 +673,18 @@
   <script src="data.js"></script>
   <script>
     // ===================================================
-    // ADMIN PANEL JAVASCRIPT LOGIKASI
-    // PIN: 2020 (Foydalanuvchi talabi)
+    // ADMIN PANEL JAVASCRIPT LOGIKASI (Xavfsiz Kriptografik SHA-256)
+    // PIN ochiq matnda saqlanmaydi, faqat 256-bitli hash bilan tekshiriladi!
     // ===================================================
-    const SECRET_PIN = "2020";
+    const SECURE_TOKEN = "f03cd406099ab2e7dce462615af402135bed28c9851de63bf023f33fe673a125";
+    const SALT = "ibrohim_choyxona_secure_2026";
     let enteredPin = "";
+
+    async function computeHash(val) {
+      const buffer = new TextEncoder().encode(val + SALT);
+      const digest = await crypto.subtle.digest("SHA-256", buffer);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     // PIN bilan ishlash
     function updatePinDots() {
@@ -691,15 +710,20 @@
       }
     }
 
-    function verifyPin() {
-      if (enteredPin === SECRET_PIN) {
-        sessionStorage.setItem("ibrohim_admin_auth", "true");
-        unlockAdmin();
-      } else {
-        document.getElementById("pinError").textContent = "❌ Noto'g'ri PIN-kod! Qaytadan tering.";
-        enteredPin = "";
-        updatePinDots();
+    async function verifyPin() {
+      try {
+        const hash = await computeHash(enteredPin);
+        if (hash === SECURE_TOKEN) {
+          sessionStorage.setItem("ibrohim_admin_auth", "true");
+          unlockAdmin();
+          return;
+        }
+      } catch (e) {
+        console.error("Xatolik", e);
       }
+      document.getElementById("pinError").textContent = "❌ Noto'g'ri PIN-kod! Qaytadan tering.";
+      enteredPin = "";
+      updatePinDots();
     }
 
     function unlockAdmin() {
@@ -974,6 +998,54 @@
       renderStopList(e.target.value);
     });
 
+    // Taom rasmini yuklash va siqish (avtomatik resize)
+    let uploadedDishImageData = "";
+    const dishFileInput = document.getElementById("newDishFileInput");
+    const dishUploadBox = document.getElementById("dishUploadBox");
+    const dishUploadPreview = document.getElementById("dishUploadPreview");
+    const dishUploadPrompt = document.getElementById("dishUploadPrompt");
+
+    if (dishUploadBox && dishFileInput) {
+      dishUploadBox.addEventListener("click", () => dishFileInput.click());
+      dishFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement("canvas");
+            const maxDim = 480;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            uploadedDishImageData = canvas.toDataURL("image/jpeg", 0.85);
+
+            dishUploadPreview.src = uploadedDishImageData;
+            dishUploadPreview.style.display = "block";
+            dishUploadPrompt.innerHTML = "<span>✅ Rasm yuklandi! (Boshqa rasm tanlash uchun bosing)</span>";
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     // Yangi taom qo'shish
     document.getElementById("saveNewDishBtn").addEventListener("click", () => {
       const name = document.getElementById("newDishName").value.trim();
@@ -995,7 +1067,7 @@
         price,
         badge: badge || "YANGI",
         badgeType: "new",
-        image: "images/logo_circle.jpg",
+        image: uploadedDishImageData || "images/logo_circle.jpg",
         description: desc || name
       };
 
@@ -1009,6 +1081,9 @@
       document.getElementById("newDishPrice").value = "";
       document.getElementById("newDishBadge").value = "";
       document.getElementById("newDishDesc").value = "";
+      uploadedDishImageData = "";
+      if (dishUploadPreview) dishUploadPreview.style.display = "none";
+      if (dishUploadPrompt) dishUploadPrompt.innerHTML = "<span>📸</span><span>Rasm tanlash (Telefon yoki Kompyuter)</span>";
 
       // Stop tabiga o'tkazish
       document.querySelector('.admin-tab[data-tab="stopTab"]').click();
