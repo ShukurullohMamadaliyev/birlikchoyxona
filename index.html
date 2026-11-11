@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Ibrohim Ota Choyxonasi | QR Menyu</title>
+  
+  <!-- Mobil brauzer moslashuvlari -->
+  <meta name="theme-color" content="#190305">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Ibrohim Ota choyxonasi - Mazali osh, shashlik va choy! Qulay mobil QR-menyu.">
+
+  <!-- Favicon va Logotip -->
+  <link rel="icon" type="image/jpeg" href="images/logo_circle.jpg">
+  <link rel="apple-touch-icon" href="images/logo_circle.jpg">
+
+  <!-- Stillar -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Tepadagi tezkor aloqa paneli -->
+    <header class="top-contact-bar">
+      <a href="tel:771100098" class="contact-btn phone">
+        <span>📞</span>
+        <span>77 110 00 98</span>
+      </a>
+      <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" class="contact-btn social">
+        <span>📷</span>
+        <span>Instagram</span>
+      </a>
+      <a href="https://t.me" target="_blank" rel="noopener noreferrer" class="contact-btn social">
+        <span>✈️</span>
+        <span>Telegram</span>
+      </a>
+    </header>
+
+    <!-- Bosh Banner va Choyxona Logotipi -->
+    <section class="hero-banner">
+      <div class="logo-circle-wrapper">
+        <img src="images/logo_circle.jpg" alt="Ibrohim Ota Choyxonasi" class="logo-circle-img">
+      </div>
+      <h1 class="brand-title">IBROHIM OTA</h1>
+      <p class="brand-subtitle">Choyxonasi • Mazali osh, shashlik va choy!</p>
+
+      <!-- Agar QR kodda xona bo'lsa avtomatik ko'rinadi -->
+      <div id="activeTableBadge" class="active-table-badge" style="display: none;">
+        <span class="pulse-dot"></span>
+        <span>Xonangiz aniqlandi</span>
+      </div>
+    </section>
+
+    <!-- Qidiruv paneli -->
+    <div class="search-wrapper">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Taom qidirish..." autocomplete="off">
+        <button id="clearSearchBtn" class="clear-search-btn" title="Tozalash">✕</button>
+      </div>
+    </div>
+
+    <!-- Kategoriya teglari (Slider) -->
+    <nav class="categories-container" aria-label="Menyu toifalari">
+      <div class="categories-track" id="categoriesTrack">
+        <!-- JS orqali dinamik chiqariladi -->
+      </div>
+    </nav>
+
+    <!-- Asosiy Taomlar Menyu Ro'yxati -->
+    <main class="menu-content" id="menuContainer">
+      <!-- data.js dagi taomlar app.js orqali chiziladi -->
+    </main>
+
+    <!-- Pastki qism / Footer -->
+    <footer class="choyxona-footer">
+      <img src="images/logo_circle.jpg" alt="Logo" class="footer-logo">
+      <div class="footer-name">Ibrohim Ota Choyxonasi</div>
+      <div class="footer-text">
+        Birlik mahallasi • Eng mazali milliy taomlar, tandir somsalar va six shashliklar!<br>
+        Osh har kuni soat 11:30 dan boshlab tayyor.
+      </div>
+      <a href="tel:771100098" class="footer-phone">📞 77 110 00 98</a>
+    </footer>
+
+    <!-- Pastda Yopishib Turuvchi Savatcha Tugmasi (Floating Bar) -->
+    <aside class="floating-cart-bar" id="floatingCartBar" role="button" aria-label="Savatchani ko'rish">
+      <div class="cart-left">
+        <div class="cart-badge-circle" id="floatingCartCount">0</div>
+        <div class="cart-label">Savatcha</div>
+      </div>
+      <div class="cart-total-price" id="floatingCartTotal">0 so'm</div>
+    </aside>
+
+  </div>
+
+  <!-- ===================================================
+       1. TAOM HAQIDA BATAFSIL MODAL
+  =================================================== -->
+  <div class="modal-overlay" id="dishDetailModal" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="sheet-header">
+        <span class="sheet-title">Taom haqida</span>
+        <button class="sheet-header-btn" id="closeDetailBtn">✕ Yopish</button>
+      </div>
+      <div class="dish-detail-body" id="dishDetailContent">
+        <!-- JS orqali to'ldiriladi -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       2. SAVATCHA (CART) MODALI
+  =================================================== -->
+  <div class="modal-overlay" id="cartModal" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      
+      <!-- Savatcha tepasi -->
+      <div class="sheet-header">
+        <button class="sheet-header-btn" id="closeCartBtn">‹ Menyuga qaytish</button>
+        <span class="sheet-title">🛒 Savatcha</span>
+        <button class="sheet-header-btn clear-cart-btn" id="clearCartBtn">Tozalash</button>
+      </div>
+
+      <!-- Savatcha bo'sh holati -->
+      <div class="empty-cart-state" id="cartEmptyState" style="display: none;">
+        <div class="empty-cart-icon">🛒</div>
+        <div class="empty-cart-title">Savatchangiz bo'sh</div>
+        <div class="empty-cart-text">Menyudan o'zingiz yoqtirgan lazzatli taomlarni tanlang</div>
+      </div>
+
+      <!-- Savatcha to'la holati -->
+      <div id="cartContentArea">
+        
+        <!-- Tanlangan taomlar ro'yxati -->
+        <div class="cart-items-container" id="cartItemsList">
+          <!-- JS orqali chiziladi -->
+        </div>
+
+        <!-- Hisob-kitob bloki -->
+        <div class="cart-summary-box">
+          <div class="summary-row">
+            <span>Taomlar summasi</span>
+            <strong id="summarySubtotal">0 so'm</strong>
+          </div>
+          <div class="summary-row">
+            <span>Xizmat haqi</span>
+            <strong id="summaryServiceFee">0 so'm (0%)</strong>
+          </div>
+          <div class="summary-divider"></div>
+          <div class="summary-total-row">
+            <span class="summary-total-label">JAMI:</span>
+            <span class="summary-total-price" id="summaryGrandTotal">0 so'm</span>
+          </div>
+        </div>
+
+        <!-- Majburiy maydon: Xona / Stol raqami -->
+        <div class="room-input-container">
+          <label class="room-input-label" for="roomNumberInput">
+            📍 Qaysi xona yoki stoldasiz? (Majburiy)
+          </label>
+          <div class="room-input-wrapper">
+            <span style="font-size: 20px;">🚪</span>
+            <input 
+              type="text" 
+              id="roomNumberInput" 
+              class="room-input" 
+              placeholder="masalan, 5-xona yoki 2-stol"
+              maxlength="30"
+              autocomplete="off"
+            >
+          </div>
+
+          <!-- Tezkor xona tanlash (Katta yoshdagilar oson bosishi uchun) -->
+          <div class="quick-rooms">
+            <button type="button" class="room-chip" data-val="1-xona">1-xona</button>
+            <button type="button" class="room-chip" data-val="2-xona">2-xona</button>
+            <button type="button" class="room-chip" data-val="3-xona">3-xona</button>
+            <button type="button" class="room-chip" data-val="4-xona">4-xona</button>
+            <button type="button" class="room-chip" data-val="5-xona">5-xona</button>
+            <button type="button" class="room-chip" data-val="6-xona">6-xona</button>
+            <button type="button" class="room-chip" data-val="7-xona">7-xona</button>
+            <button type="button" class="room-chip" data-val="8-xona">8-xona</button>
+            <button type="button" class="room-chip" data-val="Katta zal">Katta zal</button>
+            <button type="button" class="room-chip" data-val="Kichik zal">Kichik zal</button>
+          </div>
+        </div>
+
+        <!-- Xatolik ogohlantirish banneri -->
+        <div class="validation-error-banner" id="validationErrorBanner">
+          ⚠️ Avval xona yoki stol raqamini kiriting!
+        </div>
+
+        <!-- Amallar tugmalari -->
+        <div class="cart-actions">
+          <button class="btn-primary-send" id="sendToCashierBtn">
+            <span>📨</span>
+            <span>Kassaga yuborish</span>
+          </button>
+          <button class="btn-secondary-waiter" id="showToWaiterBtn">
+            <span>👨‍💼</span>
+            <span>Ofitsiantga ko'rsatish</span>
+          </button>
+          <p class="cart-subtext">
+            Buyurtma kassaga va oshxonaga boradi, ofitsiant tez orada tasdiqlaydi. Xohlasangiz, ekranni ofitsiantga ko'rsating.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================
+       3. KREATIV TASDIQLASH OYNASI (Prompt talabi)
+  =================================================== -->
+  <div class="modal-overlay" id="confirmOrderModal" role="dialog" aria-modal="true">
+    <div class="confirm-box">
+      <div class="confirm-icon">👨‍🍳</div>
+      <h2 class="confirm-title">Taomlarimiz ma'qulmi? 😊</h2>
+      <p class="confirm-text">
+        Haqiqatan ham mana shu tanlangan lazzatli taomlarni buyurtma bermoqchimisiz?
+      </p>
+
+      <!-- Buyurtma xulosasi -->
+      <div class="confirm-details-card">
+        <div class="confirm-detail-item">
+          <span class="confirm-detail-label">Xona / Stol:</span>
+          <span class="confirm-detail-val" id="confirmRoomVal">5-xona</span>
+        </div>
+        <div class="confirm-detail-item">
+          <span class="confirm-detail-label">Miqdori:</span>
+          <span class="confirm-detail-val" id="confirmCountVal">3 ta</span>
+        </div>
+        <div class="confirm-detail-item">
+          <span class="confirm-detail-label">Umumiy summa:</span>
+          <span class="confirm-detail-val" id="confirmTotalVal" style="color: var(--gold-light);">0 so'm</span>
+        </div>
+      </div>
+
+      <!-- Kreativ tugmalar -->
+      <div class="confirm-actions">
+        <button class="btn-confirm-yes" id="confirmYesBtn">
+          🚀 Ha, buyurtmani yuboring!
+        </button>
+        <button class="btn-confirm-more" id="confirmMoreBtn">
+          😋 Yana boshqa ovqatlarni tanlayman
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================
+       4. CHEK VA OFITSIANTGA KO'RSATISH EKRANI
+  =================================================== -->
+  <div class="modal-overlay" id="receiptModal" role="dialog" aria-modal="true">
+    <div class="modal-sheet" style="background: var(--bg-dark);">
+      
+      <div class="receipt-wrapper">
+        <div class="receipt-header">
+          <div class="receipt-logo-name">IBROHIM OTA CHOYXONASI</div>
+          <div class="receipt-order-title" id="receiptRoomHeader">BUYURTMA • 5-xona</div>
+          <div class="receipt-time" id="receiptTimeVal">18:00</div>
+        </div>
+
+        <!-- Status bildirishnomasi -->
+        <div class="receipt-status-banner" id="receiptStatusBanner">
+          ✅ Kassaga yuborildi — ofitsiant tez orada tasdiqlaydi
+        </div>
+
+        <!-- Buyurtma qilingan taomlar -->
+        <div class="receipt-items-list" id="receiptItemsList">
+          <!-- JS orqali to'ldiriladi -->
+        </div>
+
+        <!-- Hisob-kitob -->
+        <div class="receipt-breakdown">
+          <div class="receipt-breakdown-row">
+            <span id="receiptItemsSubtotalLabel">Taomlar</span>
+            <span id="receiptSubtotalVal">0 so'm</span>
+          </div>
+          <div class="receipt-breakdown-row">
+            <span>Xizmat haqi (0%)</span>
+            <span id="receiptServiceFeeVal">0 so'm</span>
+          </div>
+        </div>
+
+        <div class="receipt-grand-total">
+          <span class="grand-total-label">JAMI:</span>
+          <span class="grand-total-val" id="receiptGrandTotalVal">0 so'm</span>
+        </div>
+
+        <!-- Chek amallari -->
+        <div class="receipt-actions">
+          <button class="receipt-btn-edit" id="receiptEditBtn">
+            ‹ Tahrirlash
+          </button>
+          <button class="receipt-btn-new" id="receiptNewOrderBtn">
+            Menyuga qaytish
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Skriptlar -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
