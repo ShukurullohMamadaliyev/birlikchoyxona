@@ -110,7 +110,17 @@ body {
   background: var(--gold-gradient);
   color: var(--text-dark);
   box-shadow: var(--shadow-sm);
+  flex: 1.1;
+  font-size: 13.5px;
+}
+
+.contact-btn.bot {
+  background: linear-gradient(135deg, #229ED9 0%, #0088cc 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 3px 10px rgba(0, 136, 204, 0.35);
   flex: 1.3;
+  font-size: 13px;
 }
 
 .contact-btn.social {

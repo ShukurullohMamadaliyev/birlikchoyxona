@@ -599,11 +599,11 @@ function openReceiptScreen(mode) {
   if (mode === "sent") {
     statusBanner.style.background = "#dcfce7";
     statusBanner.style.color = "#166534";
-    statusBanner.innerHTML = `✅ Kassaga yuborildi — ofitsiant tez orada tasdiqlaydi`;
+    statusBanner.innerHTML = `🎉 <strong>Buyurtma qabul qilindi, siz uchun tayyorlanyapti!</strong><br><span style="font-size: 13px; font-weight: 700; opacity: 0.95;">Ofitsiant tez orada buyurtmangizni olib keladi 👨‍🍳✨</span>`;
   } else {
     statusBanner.style.background = "#fef3c7";
     statusBanner.style.color = "#92400e";
-    statusBanner.innerHTML = `📋 Ofitsiantga ko'rsatish rejimi — buyurtmani ofitsiantga taqdim eting`;
+    statusBanner.innerHTML = `📋 <strong>Ofitsiantga ko'rsatish rejimi</strong><br><span style="font-size: 13px; font-weight: 700;">Buyurtmani ofitsiantga taqdim eting</span>`;
   }
 
   // Taomlar ro'yxati
