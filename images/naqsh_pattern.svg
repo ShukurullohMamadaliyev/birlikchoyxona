@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .naqsh-line {
+        fill: none;
+        stroke: #f59e0b;
+        stroke-width: 1.1;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        opacity: 0.16;
+      }
+      .naqsh-inner {
+        fill: none;
+        stroke: #fbbf24;
+        stroke-width: 0.7;
+        opacity: 0.10;
+      }
+      .naqsh-dot {
+        fill: #f59e0b;
+        opacity: 0.20;
+      }
+    </style>
+  </defs>
+
+  <!-- Center Star (Outer) -->
+  <path class="naqsh-line" d="M 32,2 C 32,18 46,32 62,32 C 46,32 32,46 32,62 C 32,46 18,32 2,32 C 18,32 32,18 32,2 Z" />
+  
+  <!-- Center Star (Inner Delicate Ring) -->
+  <path class="naqsh-inner" d="M 32,12 C 32,24 40,32 52,32 C 40,32 32,40 32,52 C 32,40 24,32 12,32 C 24,32 32,24 32,12 Z" />
+
+  <!-- Center Core Dot -->
+  <circle class="naqsh-dot" cx="32" cy="32" r="1.8" />
+
+  <!-- Four Corners (Corner Star Quadrants) -->
+  <!-- Top-Left -->
+  <path class="naqsh-line" d="M 0,32 C 0,16 16,0 32,0" />
+  <circle class="naqsh-dot" cx="0" cy="0" r="1.5" />
+
+  <!-- Top-Right -->
+  <path class="naqsh-line" d="M 32,0 C 48,0 64,16 64,32" />
+  <circle class="naqsh-dot" cx="64" cy="0" r="1.5" />
+
+  <!-- Bottom-Right -->
+  <path class="naqsh-line" d="M 64,32 C 64,48 48,64 32,64" />
+  <circle class="naqsh-dot" cx="64" cy="64" r="1.5" />
+
+  <!-- Bottom-Left -->
+  <path class="naqsh-line" d="M 32,64 C 16,64 0,48 0,32" />
+  <circle class="naqsh-dot" cx="0" cy="64" r="1.5" />
+</svg>
