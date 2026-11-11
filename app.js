@@ -670,6 +670,7 @@ function recordOrder(mode) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
     const dateStr = now.toLocaleDateString('uz-UZ');
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const newOrder = {
       orderId: "ORD-" + Date.now().toString().slice(-5),
@@ -681,6 +682,7 @@ function recordOrder(mode) {
       grandTotal,
       time: timeStr,
       date: dateStr,
+      dateKey: dateKey,
       timestamp: Date.now(),
       status: "pending", // "pending" (tayyorlanmoqda), "completed" (to'landi), "vozvrat" (bekor)
       mode: mode || "online"

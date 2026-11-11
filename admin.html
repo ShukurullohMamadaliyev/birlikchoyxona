@@ -619,18 +619,21 @@
           </div>
         </div>
 
-        <button id="resetTodayStatsBtn" style="width: 100%; padding: 12px; background: rgba(185, 28, 28, 0.2); border: 1px solid #dc2626; color: #fca5a5; border-radius: var(--radius-md); font-size: 13px; font-weight: 800; cursor: pointer;">
-          🗑️ Yangi kun boshlash (Kassa hisobotini yangilash)
-        </button>
+        <!-- Avtomatik 24:00 yangilanish eslatmasi (Hech kim qasddan nol qilib o'chirolmaydi) -->
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 12px 14px; text-align: center;">
+          <div style="font-size: 13.5px; font-weight: 800; color: #6ee7b7; margin-bottom: 3px;">
+            ⏰ Avtomatik 24:00 Kassa Yangilanishi
+          </div>
+          <div style="font-size: 12px; color: #a7f3d0; line-height: 1.4;">
+            Kassa har kuni soat 24:00 dan so'ng avtomatik ravishda 0 so'mdan boshlanadi. Hech kim uni qolda 0 qilib adashtirolmaydi. Tarix to'liq saqlanib qoladi.
+          </div>
+        </div>
       </div>
 
       <!-- TAB 2: BUYURTMALAR (KASSA NAZORATI) -->
       <div id="ordersTab" class="tab-pane" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h2 style="font-size: 17px; font-weight: 800; color: var(--gold-light);">Kelgan Buyurtmalar</h2>
-          <button id="clearAllOrdersBtn" style="background: transparent; border: none; color: #f87171; font-size: 12.5px; font-weight: bold; cursor: pointer;">
-            Tarixni tozalash
-          </button>
         </div>
 
         <div class="orders-list" id="adminOrdersContainer">
@@ -856,10 +859,18 @@
       return list;
     }
 
-    // Statistika paneli
+    function getTodayDateKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // Statistika paneli (Har kuni soat 24:00 dan keyin avtomatik 0 bo'ladi)
     function renderStats() {
       const orders = getOrders();
       const stopList = getStopList();
+
+      const todayKey = getTodayDateKey();
+      const todayLocale = new Date().toLocaleDateString('uz-UZ');
 
       let totalSales = 0;
       let completedCount = 0;
@@ -868,27 +879,32 @@
       const roomTotals = {};
 
       orders.forEach(ord => {
-        if (ord.status === "completed") {
-          totalSales += ord.grandTotal || 0;
-          completedCount++;
-          const rm = ord.room || "Noma'lum xona";
-          roomTotals[rm] = (roomTotals[rm] || 0) + (ord.grandTotal || 0);
-        } else if (ord.status === "vozvrat") {
-          vozvratCount++;
-          vozvratTotal += ord.grandTotal || 0;
+        // Soat 24:00 da sana o'zgargach, avtomatik 0 bo'ladi
+        const isToday = (ord.dateKey === todayKey) || (ord.date === todayLocale);
+
+        if (isToday) {
+          if (ord.status === "completed") {
+            totalSales += ord.grandTotal || 0;
+            completedCount++;
+            const rm = ord.room || "Noma'lum xona";
+            roomTotals[rm] = (roomTotals[rm] || 0) + (ord.grandTotal || 0);
+          } else if (ord.status === "vozvrat") {
+            vozvratCount++;
+            vozvratTotal += ord.grandTotal || 0;
+          }
         }
       });
 
       document.getElementById("todayTotalSales").textContent = formatSum(totalSales);
-      document.getElementById("todayCompletedOrders").textContent = `${completedCount} ta to'langan hisob`;
+      document.getElementById("todayCompletedOrders").textContent = `${completedCount} ta bugun yopilgan hisob`;
       document.getElementById("statAllOrdersCount").textContent = `${orders.length} ta`;
       document.getElementById("statVozvratCount").textContent = `${vozvratCount} ta (${formatSum(vozvratTotal)})`;
       document.getElementById("statSoldOutCount").textContent = `${stopList.length} ta`;
 
-      // Xonalar ro'yxati
+      // Xonalar ro'yxati (Bugungi kun bo'yicha)
       const roomsContainer = document.getElementById("roomsBreakdownList");
       if (Object.keys(roomTotals).length === 0) {
-        roomsContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 13px;">Hozircha buyurtmalar yo'q</div>`;
+        roomsContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 13px;">Bugun hali hisob-kitob qilinmadi</div>`;
       } else {
         roomsContainer.innerHTML = Object.entries(roomTotals).map(([rm, sum]) => `
           <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px dashed rgba(251,191,36,0.15);">
@@ -1037,26 +1053,6 @@
         }
       }
     };
-
-    window.deleteOrder = function(idx) {
-      if (confirm("Ushbu buyurtmani o'chirmoqchimisiz?")) {
-        const orders = getOrders();
-        orders.splice(idx, 1);
-        saveOrders(orders);
-      }
-    };
-
-    document.getElementById("clearAllOrdersBtn").addEventListener("click", () => {
-      if (confirm("Barcha buyurtmalar tarixini tozalashni xohlaysizmi?")) {
-        saveOrders([]);
-      }
-    });
-
-    document.getElementById("resetTodayStatsBtn").addEventListener("click", () => {
-      if (confirm("Bugungi kassa hisobotini tozalab, yangi kunni boshlaysizmi?")) {
-        saveOrders([]);
-      }
-    });
 
     // Stop-List (Mavjud / Tugadi)
     function renderStopList(query = "") {
